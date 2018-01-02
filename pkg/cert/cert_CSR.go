@@ -2,6 +2,7 @@ package cert
 
 import (
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"io/ioutil"
 
 	vault "github.com/hashicorp/vault/api"
 )
@@ -104,6 +106,36 @@ func (c *Cert) verifyCertificates() error {
 
 	if err := conf.ConfigureTLS(tConf); err != nil {
 		return fmt.Errorf("error verifying cert: %v", err)
+	}
+
+	roots := x509.NewCertPool()
+
+	pem, err := ioutil.ReadFile(tConf.CACert)
+        if err != nil {
+                return fmt.Errorf("Error loading CA File: %s", err)
+        }
+
+	ok := roots.AppendCertsFromPEM(pem)
+	if !ok {
+		return fmt.Errorf("Error loading CA File: Couldn't parse PEM in: %s", tConf.CACert)
+	}
+
+	certX, err := tls.LoadX509KeyPair(tConf.ClientCert, tConf.ClientKey)
+	if err != nil {
+		return fmt.Errorf("Error loading keypair: %s and %s", tConf.ClientCert, tConf.ClientKey)
+        }
+
+	cert, err := x509.ParseCertificate(certX.Certificate[0])
+	if err != nil {
+		return fmt.Errorf("Failed to parse x509 certificate: %v", err)
+	}
+
+        opts := x509.VerifyOptions{
+		Roots: roots,
+	}
+
+	if _, err := cert.Verify(opts); err != nil {
+		return fmt.Errorf("Error verifying certificate: %v", err)
 	}
 
 	return nil

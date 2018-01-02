@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"io/ioutil"
+	"time"
 
 	vault "github.com/hashicorp/vault/api"
 )
@@ -131,7 +132,8 @@ func (c *Cert) verifyCertificates() error {
 	}
 
         opts := x509.VerifyOptions{
-		Roots: roots,
+		Roots:       roots,
+		CurrentTime: time.Now().Add(24*time.Hour),
 	}
 
 	if _, err := cert.Verify(opts); err != nil {
